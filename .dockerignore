@@ -1,0 +1,35 @@
+# Secrets
+.env
+
+# Git history (not needed in image)
+.git/
+.gitignore
+
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Docs / problem statement files (not needed at runtime)
+*.md
+SUST_*.json
+SUST_*.md
+
+# IDE / editor
+.vscode/
+.idea/
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+*.log
+
+# This file itself
+.dockerignore
