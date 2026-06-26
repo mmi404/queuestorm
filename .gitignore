@@ -1,5 +1,6 @@
 # Secrets — never commit real keys
-.env
+.env*
+!.env.example
 
 # Python bytecode
 __pycache__/
@@ -13,12 +14,19 @@ venv/
 env/
 ENV/
 
-# Test/build artifacts
+# Test / coverage artifacts
 .pytest_cache/
+.coverage
+htmlcov/
 *.egg-info/
 dist/
 build/
 *.log
+
+# Database files
+*.sqlite
+*.sqlite3
+*.db
 
 # IDE / editor
 .vscode/

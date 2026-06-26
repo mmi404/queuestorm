@@ -71,7 +71,8 @@ merchant_operations, agent_operations, fraud_risk
      (e.g., same counterparty appears 3+ times in history yet customer claims it was a wrong transfer to a stranger)
    - insufficient_data: complaint is vague, no transaction matches, or multiple transactions are equally plausible
 4. For duplicate_payment: set relevant_transaction_id to the SECOND (later) transaction — the likely duplicate.
-5. When multiple transactions could match and you cannot confidently choose one, set relevant_transaction_id to null.
+5. AMBIGUITY RULE — When two or more transactions have the same amount on the same date referenced in the complaint and you cannot uniquely identify which one the customer means, set relevant_transaction_id to null and evidence_verdict to insufficient_data. Do NOT guess. Ask for the counterparty's number or other disambiguating detail.
+6. ESTABLISHED RECIPIENT RULE — When a customer claims a transfer was a "wrong transfer" or "mistake", count how many times that counterparty appears in the full transaction history. If that counterparty appears 2 or more times total (including the disputed transaction), set evidence_verdict to inconsistent and add "established_recipient_pattern" to reason_codes. An established payment pattern directly contradicts the claim of an accidental transfer.
 
 ## HUMAN REVIEW REQUIRED — set true when:
 - case_type is wrong_transfer, phishing_or_social_engineering, or duplicate_payment
