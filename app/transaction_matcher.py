@@ -116,6 +116,12 @@ def match_transactions(
 
     # ambiguous: two candidates with identical top score
     if len(scored) > 1 and scored[0][0] == scored[1][0]:
+        # Exception: same counterparty + same amount = duplicate payment pattern.
+        # Pick the later transaction (the likely duplicate) rather than flagging ambiguity.
+        top_a, top_b = scored[0][1], scored[1][1]
+        if top_a.counterparty == top_b.counterparty and abs(top_a.amount - top_b.amount) < 1:
+            later = top_a if top_a.timestamp > top_b.timestamp else top_b
+            return later.transaction_id, "consistent", ["duplicate_payment_pattern"]
         return None, "insufficient_data", ["ambiguous_match"]
 
     best_score, best_tx, best_reasons = scored[0]
@@ -140,7 +146,12 @@ PHISHING_KW = [
     "called me", "sms asking", "asking for my", "verification code",
     "account will be", "share it", "প্রদান করুন", "পিন", "ওটিপি",
 ]
-WRONG_TRANSFER_KW = ["wrong number", "wrong person", "wrong recipient", "ভুল নম্বর", "ভুলে", "wrong transfer"]
+WRONG_TRANSFER_KW = [
+    "wrong number", "wrong person", "wrong recipient", "ভুল নম্বর", "ভুলে", "wrong transfer",
+    "didn't get it", "did not get it", "didn't receive", "did not receive",
+    "not received", "hasn't received", "has not received",
+    "পায়নি", "পাননি",
+]
 DUPLICATE_KW = ["duplicate", "twice", "double", "charged twice", "deducted twice", "দুইবার", "দুবার"]
 FAILED_KW = ["failed", "not completed", "unsuccessful", "app showed failed", "showed error"]
 REFUND_KW = ["refund", "return my money", "money back", "get my money", "রিফান্ড", "ফেরত"]
