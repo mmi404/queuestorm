@@ -39,8 +39,16 @@ Analyze the ticket and return ONLY a valid JSON object. No explanation, no markd
 }
 
 ## CASE TYPES (exact values only)
-wrong_transfer, payment_failed, refund_request, duplicate_payment,
-merchant_settlement_delay, agent_cash_in_issue, phishing_or_social_engineering, other
+wrong_transfer: customer sent money to an incorrect recipient, OR the intended recipient claims they did not receive the funds
+payment_failed: transaction failed but balance may have been deducted
+refund_request: customer wants money back for a completed transaction
+duplicate_payment: customer was charged twice for the same transaction
+merchant_settlement_delay: merchant's settlement funds have not arrived
+agent_cash_in_issue: cash-in via agent is not reflected in customer's balance
+phishing_or_social_engineering: suspicious contact requesting credentials or threatening account action
+other: complaint is too vague to classify or does not fit any above category
+
+IMPORTANT: case_type is always determined by the INTENT of the complaint. Even when relevant_transaction_id is null or evidence_verdict is insufficient_data (because the match is ambiguous), you must still classify case_type based on what the customer is complaining about — do not default to "other" just because you cannot identify the exact transaction.
 
 ## DEPARTMENTS (exact values only)
 customer_support, dispute_resolution, payments_ops,
@@ -71,7 +79,8 @@ merchant_operations, agent_operations, fraud_risk
      (e.g., same counterparty appears 3+ times in history yet customer claims it was a wrong transfer to a stranger)
    - insufficient_data: complaint is vague, no transaction matches, or multiple transactions are equally plausible
 4. For duplicate_payment: set relevant_transaction_id to the SECOND (later) transaction — the likely duplicate.
-5. AMBIGUITY RULE — When two or more transactions have the same amount on the same date referenced in the complaint and you cannot uniquely identify which one the customer means, set relevant_transaction_id to null and evidence_verdict to insufficient_data. Do NOT guess. Ask for the counterparty's number or other disambiguating detail.
+5. AMBIGUITY RULE — When two or more transactions have the same amount on the same date and go to DIFFERENT counterparties (or the same counterparty but the context does not indicate a duplicate), and you cannot uniquely identify which one the customer means, set relevant_transaction_id to null and evidence_verdict to insufficient_data. Do NOT guess. Ask for the counterparty's number or other disambiguating detail.
+   EXCEPTION: For duplicate_payment, two identical transactions to the SAME counterparty within a short time window are themselves the evidence. Do NOT apply the ambiguity rule — instead set relevant_transaction_id to the SECOND (later) transaction and evidence_verdict to consistent.
 6. ESTABLISHED RECIPIENT RULE — When a customer claims a transfer was a "wrong transfer" or "mistake", count how many times that counterparty appears in the full transaction history. If that counterparty appears 2 or more times total (including the disputed transaction), set evidence_verdict to inconsistent and add "established_recipient_pattern" to reason_codes. An established payment pattern directly contradicts the claim of an accidental transfer.
 
 ## HUMAN REVIEW REQUIRED — set true when:
