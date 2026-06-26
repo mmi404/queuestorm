@@ -9,7 +9,7 @@ import httpx
 from openai import AsyncOpenAI
 
 from .models import TicketRequest
-from .transaction_matcher import build_rule_based_response, INJECTION_KW
+from .transaction_matcher import build_rule_based_response, match_transactions, INJECTION_KW
 
 # ---------------------------------------------------------------------------
 # System prompt
@@ -258,6 +258,18 @@ def _build_user_message(request: TicketRequest) -> str:
             )
     else:
         lines.append("TRANSACTION HISTORY: (none provided)")
+
+    # Rule-based pre-analysis: inject exact computed signals as grounded hints.
+    # The LLM must still reason the final answer but starts from correct signals
+    # rather than deriving them from scratch (where counting errors are common).
+    full_history = request.transaction_history or []
+    rb_tx_id, rb_verdict, rb_reasons = match_transactions(request.complaint, full_history)
+    lines.append("")
+    lines.append("PRE-ANALYSIS (rule-based signals — treat as strong hints; override only if complaint context clearly warrants it):")
+    lines.append(f"  best_match_transaction: {rb_tx_id or 'none'}")
+    lines.append(f"  suggested_evidence_verdict: {rb_verdict}")
+    if rb_reasons:
+        lines.append(f"  signals: {', '.join(rb_reasons)}")
 
     return "\n".join(lines)
 

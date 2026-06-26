@@ -37,14 +37,19 @@ Rather than depending on a single API, we built a sequential fallback chain. If 
 
 ### Evidence Reasoning Pipeline
 
-The service is designed as an **investigator**, not a text classifier. Before the LLM call, the complaint is pre-processed by a rule-based matcher (`app/transaction_matcher.py`) that:
+The service is designed as an **investigator**, not a text classifier. It uses a **hybrid rule-based + LLM pipeline**:
 
-1. Extracts the claimed amount from the complaint text (handles Bengali script: ৳, টাকা, and Bangla numerals)
-2. Scores each transaction in history against amount, type keyword, status alignment, and time references ("today"/"আজ", "yesterday"/"গতকাল", hour hints like "2pm")
-3. Detects inconsistency early — if a customer claims "wrong transfer" but the same counterparty appears 3+ times in history, the verdict is set to `inconsistent` before the LLM sees it
-4. Passes the pre-filtered top candidates to the LLM with the full structured prompt for final evidence reasoning
+**Step 1 — Rule-based pre-analysis** (`app/transaction_matcher.py`):
+1. Extracts the claimed amount from complaint text (handles Bengali script: ৳, টাকা, and Bangla numerals)
+2. Scores each transaction against amount, type keyword, status alignment, and time references ("today"/"আজ", "yesterday"/"গতকাল", hour hints like "2pm")
+3. Detects established recipient patterns — if a customer claims "wrong transfer" but the same counterparty appears 2+ times in history, flags `established_recipient_pattern` → suggests `inconsistent`
+4. Detects ambiguity — if two or more transactions score identically, flags `ambiguous_match` → suggests `insufficient_data` with `relevant_transaction_id: null`
 
-The LLM receives a labeled, structured user message (ticket ID, complaint, language, channel, user type, transaction list) alongside a system prompt that instructs it to reason step-by-step through the evidence before producing JSON output.
+**Step 2 — LLM call with injected signals**: The pre-analysis results (best match transaction, suggested verdict, detected signals) are injected directly into the user message sent to the LLM. This grounds the LLM in exact computed facts rather than asking it to re-derive them from scratch — where counting and comparison errors are common.
+
+**Step 3 — LLM final reasoning**: The LLM receives the full structured context (ticket ID, complaint, language, channel, user type, transaction list, pre-analysis block) and the system prompt. It reasons over the evidence, can override the pre-analysis if the complaint context warrants it, and produces the final JSON output.
+
+**Step 4 — Safety post-processing**: Regex safety checks run on every response regardless of provider (see Safety Logic below).
 
 ---
 
@@ -216,8 +221,8 @@ The test script (`test_live.py`) uses only Python stdlib — no extra installs n
 
 ## Known Limitations
 
-- **Ambiguous multi-transaction cases**: The rule-based fallback cannot handle cases where multiple transactions match equally well (e.g. three 1,000 BDT transfers on the same day). It returns `insufficient_data` and defers to the agent. The LLM handles this better via contextual reading.
-- **Duplicate detection in rule-based mode**: Identifying the second of two near-identical transactions requires temporal ordering logic that the rule-based engine approximates but the LLM handles more reliably.
+- **Ambiguous multi-transaction cases**: When multiple transactions score identically (e.g. three 1,000 BDT transfers on the same day to different recipients), the rule-based pre-analysis flags `ambiguous_match` and the LLM is instructed to return `insufficient_data` and ask for disambiguation rather than guess.
+- **Duplicate detection**: The rule-based pre-analysis does not identify duplicates directly; the LLM applies the "pick the second transaction" rule guided by the system prompt and the pre-analysis signal that two identical transactions exist.
 - **In-memory rate limiter**: Resets on container restart. Sufficient for evaluation; a production deployment would use Redis.
 - **Banglish (romanised Bengali)**: Partially handled via keyword lists. The LLM handles mixed-script input better than the rule-based fallback.
 - **No persistence**: The service is fully stateless. No ticket data is stored or logged.
